@@ -3,7 +3,7 @@ services:
     name: maintenance-ai-pro
     runtime: docker
     region: virginia
-    plan: 0.5c-512mb
+    plan: free
     healthCheckPath: /api/health
     envVars:
       - key: MAINT_AI_HOST
@@ -12,7 +12,4 @@ services:
         value: /app/data/maintenance_ai.db
       - key: MAINT_AI_API_TOKEN
         generateValue: true
-    disk:
-      name: maintenance-ai-data
-      mountPath: /app/data
-      sizeGB: 1
+  
