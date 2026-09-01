@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maintenance AI Pro 1.0 AI Evidence Engine</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Maintenance AI Pro</h1>
+      <p>Complaint-first field diagnostic assistant — 1.0 AI Evidence Engine</p>
+    </div>
+    <div class="row"><div class="status-pill" id="backendStatus">Backend: checking…</div><div class="status-pill" id="saveStatus">Local mode</div></div>
+  <div class="prod-badge">Production Build • Persistent Case Database</div>
+  </header>
+
+  <main class="app-shell">
+    <nav class="tabs">
+      <button class="tab active" data-tab="case">New Case</button>
+      <button class="tab" data-tab="diagnosis">Diagnosis</button>
+      <button class="tab" data-tab="resources">Resources</button>
+      <button class="tab" data-tab="senior">Senior Tech AI</button>
+      <button class="tab" data-tab="intelligence">Case Intelligence</button>
+      <button class="tab" data-tab="history">History</button>
+    </nav>
+
+    <section id="case" class="panel active">
+      <div class="grid two">
+        <div class="card">
+          <h2>1. Resident Complaint</h2>
+          <label>Trade / System
+            <select id="trade">
+              <option>HVAC</option>
+              <option>Electrical</option>
+              <option>Plumbing</option>
+              <option>Refrigerator</option>
+              <option>Washer</option>
+              <option>Dryer</option>
+              <option>Dishwasher</option>
+              <option>Water Heater</option>
+              <option>Building System</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label>Complaint
+            <textarea id="complaint" rows="4" placeholder="Example: AC runs but does not cool after 5 PM. Evaporator froze twice this week."></textarea>
+          </label>
+          <div class="row">
+            <button id="voiceComplaint" class="secondary">🎙 Voice Complaint</button>
+            <button id="clearCase" class="danger ghost">Clear</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>2. Asset Scan</h2>
+          <label>Data Plate / Serial Number Photo
+            <input id="dataPlatePhoto" type="file" accept="image/*" capture="environment" />
+          </label>
+          <img id="photoPreview" class="preview hidden" alt="Data plate preview" />
+          <div class="row">
+            <button id="smartScan" class="primary">📷 Smart Scan Nameplate</button>
+            <span id="ocrProgress" class="hint"></span>
+          </div>
+          <label>OCR Text
+            <textarea id="ocrText" rows="5" placeholder="Scanned nameplate text will appear here."></textarea>
+          </label>
+          <div class="grid two compact">
+            <label>Manufacturer<input id="manufacturer" placeholder="GE, Carrier, Frigidaire..." /></label>
+            <label>Model<input id="model" placeholder="Model number" /></label>
+            <label>Serial<input id="serial" placeholder="Serial number" /></label>
+            <label>Location<input id="location" placeholder="Unit / apartment" /></label>
+          </div>
+          <p class="hint">V1 stores the photo and identifiers locally. OCR/API model lookup is the next backend integration point.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-head">
+          <h2>3. Measurements & Evidence</h2>
+          <button id="voiceMeasurement" class="secondary">🎙 Dictate Reading</button>
+        </div>
+        <div id="measurementFields" class="measurement-grid"></div>
+        <label>Observations / Tests Performed
+          <textarea id="observations" rows="4" placeholder="Example: Filter clean. Indoor blower running. 24 VAC Y-to-C. Capacitor tested within 3%..."></textarea>
+        </label>
+        <div class="row end">
+          <button id="runDiagnosis" class="primary">Run Diagnostic</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="diagnosis" class="panel">
+      <div class="grid two">
+        <div class="card emphasis">
+          <h2>Primary Diagnostic Call</h2>
+          <div id="diagnosisTitle" class="diagnosis-title">No diagnosis yet</div>
+          <p id="diagnosisReason">Enter a complaint and readings, then run the diagnostic engine.</p>
+          <div class="confidence-wrap">
+            <div class="confidence-label"><span>Confidence</span><strong id="confidenceText">0%</strong></div>
+            <div class="meter"><div id="confidenceBar" class="meter-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Best Next Test</h2>
+          <p id="nextTest">No recommendation yet.</p>
+          <h3>Fastest Disproof</h3>
+          <p id="disproof">No recommendation yet.</p>
+        </div>
+      </div>
+
+      <div class="card evidence-engine-card">
+        <div class="section-head"><h2>AI Evidence Engine</h2><button id="runEvidenceEngine" class="primary">Analyze All Evidence</button></div>
+        <p class="hint">Ranks diagnoses using field readings first, then adds supporting evidence from the indexed exact-model manual and similar saved cases. Manual/history evidence can raise confidence, but cannot replace a required measurement.</p>
+        <div id="evidenceEngineStatus" class="resource-box">Not run yet.</div>
+        <div id="rankedDiagnoses"></div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <h2>Evidence Supporting Diagnosis</h2>
+          <ul id="supportEvidence"><li>No evidence yet.</li></ul>
+        </div>
+        <div class="card">
+          <h2>Evidence That Conflicts / Missing</h2>
+          <ul id="conflictEvidence"><li>No evidence yet.</li></ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Senior Tech Verification Checklist</h2>
+        <div id="verificationChecklist" class="check-grid"></div>
+      </div>
+
+      <div class="card">
+        <h2>Closing Note Generator</h2>
+        <div class="grid two compact">
+          <label>Repair Performed<input id="repairPerformed" placeholder="Example: Replaced failed capacitor and cleaned condenser coil." /></label>
+          <label>Verification<input id="verification" placeholder="Example: Tested cooling cycle; 19°F ΔT and normal amp draw." /></label>
+        </div>
+        <div class="row">
+          <button id="generateNote" class="secondary">Generate Note</button>
+          <button id="copyNote" class="ghost">Copy</button>
+        </div>
+        <textarea id="closingNote" rows="5" placeholder="Generated professional closing note appears here."></textarea>
+      </div>
+
+      <div class="row end">
+        <button id="saveCase" class="primary">Save Case to History</button>
+      </div>
+    </section>
+
+    <section id="resources" class="panel">
+      <div class="grid two">
+        <div class="card">
+          <h2>Smart Tech Sheet</h2>
+          <div class="resource-box service-finder">
+            <strong>Auto Manual Discovery & Verification</strong>
+            <p class="hint">Uses the scanned manufacturer + model to locate candidate service documents, score their trust signals, and verify exact-model coverage before indexing.</p>
+            <div class="row">
+              <button id="findServiceData" class="primary">Auto-Locate Exact Manual</button>
+              <span id="serviceDataStatus" class="hint"></span>
+            </div>
+            <div id="serviceDataResults" class="service-results"></div>
+          </div>
+          <label>Attach Tech Sheet / Service Manual PDF
+            <input id="techSheet" type="file" accept="application/pdf" />
+          </label>
+          <div id="techSheetInfo" class="resource-box">No tech sheet attached.</div>
+          <div class="row">
+            <button id="indexManual" class="primary">Index Tech Sheet</button>
+            <span id="manualStatus" class="hint"></span>
+          </div>
+          <label>Direct Manufacturer PDF URL
+            <input id="manualUrl" placeholder="Paste an exact https://...pdf link from a manufacturer site" />
+          </label>
+          <button id="fetchManualUrl" class="secondary">Fetch & Index Manufacturer PDF</button>
+          <span id="fetchManualStatus" class="hint"></span>
+          <label>Quick Question
+            <input id="manualQuestion" placeholder="Example: How do I enter diagnostic mode?" />
+          </label>
+          <button id="manualAssist" class="secondary">Search Tech Sheet</button>
+          <textarea id="manualPrompt" rows="8" readonly></textarea>
+          <p class="hint">V1.2 extracts searchable text from uploaded PDFs in your browser and can launch exact model-number service-data searches. Automatic retrieval/import of third-party PDFs still depends on source permissions and a backend proxy/API.</p>
+        </div>
+
+        <div class="card">
+          <h2>Community Fixes / YouTube</h2>
+          <p>Searches by manufacturer + model + complaint so you can compare similar field cases.</p>
+          <button id="youtubeSearch" class="primary">Find Similar YouTube Cases</button>
+          <a id="youtubeLink" class="resource-link hidden" target="_blank" rel="noopener">Open YouTube search</a>
+          <div class="warning">Community videos are supporting evidence, not authoritative service data. Verify against the tech sheet and meter readings.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Tool Bag — Suggested Tests</h2>
+        <div id="toolBag" class="tool-grid"></div>
+      </div>
+    </section>
+
+
+    <section id="senior" class="panel">
+      <div class="grid two">
+        <div class="card">
+          <h2>Conversational Senior Tech AI</h2>
+          <p class="hint">Talk naturally. Example: “I have 110 suction, 360 head, 1 degree superheat and 12 degrees subcooling. Piston system and the coil froze.”</p>
+          <label>Field Conversation
+            <textarea id="seniorInput" rows="6" placeholder="Describe the complaint, readings, what you checked, and what you think is wrong."></textarea>
+          </label>
+          <div class="row">
+            <button id="seniorVoice" class="secondary">🎙 Speak to Senior Tech</button>
+            <button id="seniorAnalyze" class="primary">Analyze Conversation</button>
+            <button id="seniorClear" class="ghost">Clear</button>
+          </div>
+          <div class="resource-box" id="parsedReadings">No spoken readings parsed yet.</div>
+        </div>
+
+        <div class="card emphasis">
+          <h2>Senior Tech Response</h2>
+          <div id="seniorVerdict" class="diagnosis-title">Ready for a field case.</div>
+          <p id="seniorResponse">Describe the problem in normal language. The assistant will extract readings, challenge weak assumptions, and recommend the next discriminating test.</p>
+          <div class="confidence-wrap">
+            <div class="confidence-label"><span>Diagnostic confidence</span><strong id="seniorConfidence">0%</strong></div>
+            <div class="meter"><div id="seniorConfidenceBar" class="meter-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <h2>What Supports the Call</h2>
+          <ul id="seniorSupport"><li>No evidence yet.</li></ul>
+        </div>
+        <div class="card">
+          <h2>What I Would Challenge</h2>
+          <ul id="seniorChallenge"><li>No challenge yet.</li></ul>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <h2>Next Field Move</h2>
+          <p id="seniorNextTest">No recommendation yet.</p>
+          <h3>Fastest Way to Prove Me Wrong</h3>
+          <p id="seniorDisproof">No recommendation yet.</p>
+        </div>
+        <div class="card">
+          <h2>Verified Manual Evidence</h2>
+          <div id="seniorManualEvidence" class="resource-box">No verified manual evidence used yet.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Conversation Log</h2>
+        <div id="seniorChatLog" class="chat-log"></div>
+      </div>
+    </section>
+
+
+    <section id="intelligence" class="panel">
+      <div class="grid two">
+        <div class="card emphasis">
+          <h2>Field Case Intelligence</h2>
+          <p class="hint">Compares the current asset, complaint, readings, and diagnosis with repairs you previously saved.</p>
+          <button id="findSimilarCases" class="primary">Find Similar Past Repairs</button>
+          <div id="caseIntelSummary" class="resource-box">No comparison run yet.</div>
+        </div>
+        <div class="card">
+          <h2>What the History Suggests</h2>
+          <div id="historySuggestion">Save completed cases with the repair and verification filled in. The app will learn from those outcomes.</div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Closest Matching Cases</h2>
+        <div id="similarCasesList"><div class="resource-box">No similar cases loaded.</div></div>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h2>Repeated Failure Pattern</h2>
+          <div id="repeatPattern">No repeated pattern identified.</div>
+        </div>
+        <div class="card">
+          <h2>Repair Outcome Memory</h2>
+          <div id="repairMemory">No confirmed repair outcomes available yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="history" class="panel">
+      <div class="card">
+        <div class="section-head">
+          <h2>Repair History</h2>
+          <button id="exportHistory" class="secondary">Export JSON</button>
+        </div>
+        <div id="historyList"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>1.0 • Evidence-Weighted Diagnostics + Manual Page References • Local-first</footer>
+  <script src="app.js"></script>
+</body>
+</html>

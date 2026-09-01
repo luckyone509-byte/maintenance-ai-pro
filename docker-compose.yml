@@ -1,0 +1,16 @@
+services:
+  maintenance-ai-pro:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - maintenance_ai_data:/app/data
+    environment:
+      - MAINT_AI_HOST=0.0.0.0
+      - MAINT_AI_PORT=8080
+      - MAINT_AI_DB=/app/data/maintenance_ai.db
+      # Set a long random value before internet-facing deployment:
+      # - MAINT_AI_API_TOKEN=change-me
+    restart: unless-stopped
+volumes:
+  maintenance_ai_data:

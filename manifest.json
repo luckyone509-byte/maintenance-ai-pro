@@ -1,0 +1,9 @@
+{
+  "name": "Maintenance AI Pro 1.0",
+  "short_name": "Maint AI Pro",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "description": "Evidence-weighted field maintenance diagnostic assistant with Smart Scan and verified service data."
+}

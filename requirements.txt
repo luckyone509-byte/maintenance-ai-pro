@@ -1,0 +1,4 @@
+Pillow>=10,<12
+pypdf>=4,<7
+requests>=2.31,<3
+# System dependency for server-side nameplate OCR: tesseract-ocr
