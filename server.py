@@ -308,11 +308,28 @@ def evidence_analysis(data):
         except:return None
     if trade=='HVAC':
         sh,sc,dt,run,rla,stat,lo,hi=n('superheat'),n('subcooling'),n('delta_t'),n('running_amps'),n('rla'),n('static_pressure'),n('low_psig'),n('high_psig')
+        drier_in,drier_out,drier_dt=n('drier_in_temp'),n('drier_out_temp'),n('drier_delta_t')
+        if drier_dt is None and drier_in is not None and drier_out is not None:
+            drier_dt=abs(drier_in-drier_out)
         if sh is not None and sc is not None:
             if sh>=20 and sc<=5: add('Likely low refrigerant charge / refrigerant loss',78,[f'High superheat: {sh:g}°F',f'Low subcooling: {sc:g}°F'],['Airflow verification','Leak confirmation / charge verification'],'Confirm airflow, leak-search, then verify charge using manufacturer method.','Normal airflow plus verified correct charge disproves low charge.','low charge leak superheat subcooling refrigerant')
-            if sh>=20 and sc>=15: add('Likely liquid-line / metering-device restriction',84,[f'High superheat: {sh:g}°F',f'High subcooling: {sc:g}°F'],['Restriction location evidence'],'Measure temperature drop across filter drier and inspect metering-device feed.','No abnormal temperature/pressure drop and normal metering feed argue against restriction.','restriction filter drier txv piston metering device')
+            if sh>=20 and sc>=15:
+                drier_confirmed=drier_dt is not None and drier_dt>=3
+                support=[f'High superheat: {sh:g}°F',f'High subcooling: {sc:g}°F']
+                if drier_dt is not None: support.append(f'Filter-drier temperature drop: {drier_dt:g}°F')
+                add(
+                    'Likely restricted liquid-line filter drier' if drier_confirmed else 'Likely liquid-line / metering-device restriction',
+                    92 if drier_confirmed else 84,
+                    support,
+                    ['Confirm temperature drop with secure, insulated probe contact'] if drier_confirmed else ([f'Filter-drier drop is only {drier_dt:g}°F — check the metering device'] if drier_dt is not None else ['Filter-drier inlet and outlet temperatures']),
+                    'Repeat the filter-drier inlet/outlet test with stabilized probes, then confirm metering-device feed before opening the system.' if drier_confirmed else 'Measure filter-drier inlet/outlet temperatures and inspect metering-device feed.',
+                    'A repeatable drop below 3°F with normal metering-device feed argues against a filter-drier restriction.' if drier_confirmed else 'No abnormal temperature/pressure drop and normal metering feed argue against restriction.',
+                    'restriction filter drier temperature drop txv piston metering device'
+                )
             if sh<=5 and sc>=15: add('Possible overcharge or evaporator overfeeding',70,[f'Low superheat: {sh:g}°F',f'High subcooling: {sc:g}°F'],['Airflow / indoor load','Manufacturer charging target'],'Verify airflow and indoor load before correcting charge.','Correct weighed charge with normal airflow shifts suspicion to metering-device overfeed.','overcharge overfeeding low superheat')
             if sh<=5 and 7<=sc<15: add('Low superheat — check low airflow / low heat load before refrigerant adjustment',72,[f'Low superheat: {sh:g}°F',f'Subcooling is not low: {sc:g}°F'],['Measured airflow or total external static','Indoor return/supply temperatures','Metering-device type/target superheat'],'Verify filter, evaporator condition, blower speed/operation and total external static; then confirm target superheat for the installed metering device.','Normal verified airflow and a manufacturer-consistent superheat target shift suspicion toward metering-device overfeed.','low superheat frozen evaporator airflow piston overfeed')
+        if drier_dt is not None and drier_dt>=3 and not (sh is not None and sc is not None and sh>=20 and sc>=15):
+            add('Possible liquid-line filter-drier restriction',76,[f'Filter-drier temperature drop: {drier_dt:g}°F'],['Stabilized superheat and subcooling'],'Confirm probe contact, record stabilized superheat/subcooling, and inspect metering-device feed.','A repeatable drop below 3°F with normal refrigerant feeding argues against a filter-drier restriction.','filter drier restriction temperature drop')
         if stat is not None and stat>0.8: add('High external static pressure / airflow restriction',82,[f'Total external static: {stat:g} in. w.c.'],['Equipment maximum rated static'],'Inspect filter, evaporator, return/supply restrictions and blower setup.','Static within rated maximum with verified airflow disproves excessive-static diagnosis.','static pressure airflow blower filter coil')
         if run is not None and rla is not None and run<rla*.45:
             support=[f'Running amps {run:g} A vs RLA {rla:g} A']
@@ -349,6 +366,9 @@ def parse_field_language(text):
         "return_temp": [r"(?:return air|return temp)\s*(?:is|at|=|:)?\s*(-?\d+(?:\.\d+)?)"],
         "supply_temp": [r"(?:supply air|supply temp)\s*(?:is|at|=|:)?\s*(-?\d+(?:\.\d+)?)"],
         "static_pressure": [r"(?:static pressure|tesp|total external static)\s*(?:is|at|=|:)?\s*(-?\d+(?:\.\d+)?)"],
+        "drier_in_temp": [r"(?:filter[ -]?drier|drier)\s*(?:inlet|in)\s*(?:temperature|temp)?\s*(?:is|at|=|:)?\s*(-?\d+(?:\.\d+)?)"],
+        "drier_out_temp": [r"(?:filter[ -]?drier|drier)\s*(?:outlet|out)\s*(?:temperature|temp)?\s*(?:is|at|=|:)?\s*(-?\d+(?:\.\d+)?)"],
+        "drier_delta_t": [r"(?:filter[ -]?drier|drier)\s*(?:temperature|temp)?\s*(?:drop|delta\s*t)\s*(?:is|at|=|:)?\s*(-?\d+(?:\.\d+)?)"],
         "voltage": [r"(?:voltage|supply voltage)\s*(?:is|at|=|:)?\s*(-?\d+(?:\.\d+)?)"],
     }
     out = {}
@@ -368,6 +388,11 @@ def senior_tech_analysis(data):
     parsed = parse_field_language(text)
     merged = dict(incoming)
     merged.update(parsed)
+    try:
+        if 'drier_delta_t' not in merged and 'drier_in_temp' in merged and 'drier_out_temp' in merged:
+            merged['drier_delta_t']=abs(float(merged['drier_in_temp'])-float(merged['drier_out_temp']))
+    except (TypeError, ValueError):
+        pass
 
     payload = {
         "trade": trade,

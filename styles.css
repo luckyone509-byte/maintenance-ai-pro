@@ -19,6 +19,7 @@ h1{margin:0;font-size:1.4rem} .topbar p{margin:4px 0 0;color:var(--muted);font-s
 .card h2{font-size:1.02rem;margin:0 0 15px}.card h3{font-size:.9rem;margin:16px 0 7px;color:#cbd5e1}
 label{display:block;color:#cbd5e1;font-size:.82rem;margin-bottom:12px}
 input,textarea,select{width:100%;margin-top:6px;background:#0d1524;color:var(--text);border:1px solid var(--border);border-radius:9px;padding:11px;font-size:.93rem}
+input.computed-measurement{background:#12243a;border-color:#2c6383;color:#bae6fd;font-weight:800}
 textarea{resize:vertical}
 button{border:0;border-radius:9px;padding:10px 13px;font-weight:700;cursor:pointer}
 .primary{background:var(--accent);color:#04202d}.secondary{background:#26364d;color:var(--text);border:1px solid #39506f}.ghost{background:transparent;color:var(--text);border:1px solid var(--border)}.danger{color:#fecaca}

@@ -13,4 +13,9 @@ intel=m.field_case_intelligence({'current':{'trade':'HVAC','manufacturer':'Goodm
 assert intel['total_matches']>=1
 parsed=m.parse_field_language('110 suction, 360 head, 1 degree superheat and 12 degrees subcooling')
 assert parsed['low_psig']==110 and parsed['high_psig']==360 and parsed['superheat']==1 and parsed['subcooling']==12
+parsed_drier=m.parse_field_language('filter drier inlet temp 96 and filter drier outlet temp 89')
+assert parsed_drier['drier_in_temp']==96 and parsed_drier['drier_out_temp']==89
+dx=m.evidence_analysis({'trade':'HVAC','complaint':'evaporator freezes','measurements':{'superheat':31,'subcooling':24,'drier_in_temp':96,'drier_out_temp':89}})
+assert dx['ranked_diagnoses'][0]['title']=='Likely restricted liquid-line filter drier'
+assert dx['ranked_diagnoses'][0]['confidence_components']['field_evidence']==92
 print('production tests passed')

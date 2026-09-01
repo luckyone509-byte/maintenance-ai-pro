@@ -37,7 +37,8 @@ const fieldsByTrade = {
     ["lra","LRA","A"],["low_psig","Low Side","psig"],["high_psig","High Side","psig"],["evap_sat","Evap Sat Temp","°F"],
     ["cond_sat","Cond Sat Temp","°F"],["suction_temp","Suction Line Temp","°F"],["liquid_temp","Liquid Line Temp","°F"],
     ["superheat","Superheat","°F"],["subcooling","Subcooling","°F"],["return_temp","Return Air","°F"],["supply_temp","Supply Air","°F"],
-    ["delta_t","ΔT","°F"],["static_pressure","Total Static","in. w.c."],["cap_rating","Cap Rating","µF"],["cap_actual","Cap Actual","µF"]
+    ["delta_t","ΔT","°F"],["drier_in_temp","Filter-Drier Inlet Temp","°F"],["drier_out_temp","Filter-Drier Outlet Temp","°F"],
+    ["drier_delta_t","Filter-Drier Temp Drop (Auto)","°F"],["static_pressure","Total Static","in. w.c."],["cap_rating","Cap Rating","µF"],["cap_actual","Cap Actual","µF"]
   ],
   Electrical: [["line_voltage","Line Voltage","V"],["hot_neutral","Hot-Neutral","V"],["hot_ground","Hot-Ground","V"],["neutral_ground","Neutral-Ground","V"],["load_amps","Load Current","A"],["resistance","Resistance","Ω"]],
   Plumbing: [["static_water","Static Pressure","psi"],["flow_water","Flow Pressure","psi"],["hot_temp","Hot Water Temp","°F"],["drain_time","Drain Time","sec"]],
@@ -56,10 +57,24 @@ function renderMeasurements(){
   wrap.innerHTML = "";
   (fieldsByTrade[trade] || fieldsByTrade.Other).forEach(([id,label,unit])=>{
     const el = document.createElement("label");
-    el.innerHTML = `${label}<input inputmode="decimal" data-measure="${id}" placeholder="${unit}">`;
+    const computed = id === "drier_delta_t";
+    el.innerHTML = `${label}<input inputmode="decimal" data-measure="${id}" placeholder="${computed ? `Auto ${unit}` : unit}"${computed ? ' readonly aria-readonly="true" class="computed-measurement" title="Calculated from the filter-drier inlet and outlet temperatures"' : ""}>`;
     wrap.appendChild(el);
   });
 }
+
+function updateDrierDrop(){
+  const inlet=document.querySelector('[data-measure="drier_in_temp"]');
+  const outlet=document.querySelector('[data-measure="drier_out_temp"]');
+  const drop=document.querySelector('[data-measure="drier_delta_t"]');
+  if(!inlet || !outlet || !drop) return;
+  if(inlet.value==="" || outlet.value==="") { drop.value=""; return; }
+  const a=Number(inlet.value), b=Number(outlet.value);
+  drop.value=Number.isFinite(a) && Number.isFinite(b) ? Math.abs(a-b).toFixed(1) : "";
+}
+$('measurementFields').addEventListener('input',e=>{
+  if(e.target.matches('[data-measure="drier_in_temp"], [data-measure="drier_out_temp"]')) updateDrierDrop();
+});
 $("trade").addEventListener("change", renderMeasurements);
 renderMeasurements();
 
@@ -94,13 +109,26 @@ function has(m,...ks){ return ks.every(k=>Number.isFinite(m[k])); }
 
 function diagnoseHVAC(c,m){
   let candidates=[];
-  const sh=val(m,"superheat"), sc=val(m,"subcooling"), dt=val(m,"delta_t"), run=val(m,"running_amps"), rla=val(m,"rla"), stat=val(m,"static_pressure");
+  const sh=val(m,"superheat"), sc=val(m,"subcooling"), dt=val(m,"delta_t"), run=val(m,"running_amps"), rla=val(m,"rla"), stat=val(m,"static_pressure"), drierDt=val(m,"drier_delta_t");
   if(sh!==null && sc!==null){
     if(sh>=20 && sc<=5) candidates.push({title:"Likely low refrigerant charge / refrigerant loss",score:82,support:[`High superheat (${sh}°F)`,`Low subcooling (${sc}°F)`],conflict:["Confirm airflow before charging","Leak confirmation still required"],next:"Check evaporator airflow, then leak-search and verify weighed charge.",disproof:"If airflow is normal and refrigerant charge by weight is correct, low-charge diagnosis is disproved."});
-    if(sh>=20 && sc>=15) candidates.push({title:"Likely refrigerant restriction",score:88,support:[`High superheat (${sh}°F)`,`High subcooling (${sc}°F)`],conflict:["Need temperature-drop / restriction location evidence"],next:"Check liquid-line/filter-drier temperature drop and metering-device feed.",disproof:"If no pressure/temperature drop exists across suspect restriction and metering device feeds normally, restriction is unlikely."});
+    if(sh>=20 && sc>=15){
+      const drierConfirmed=drierDt!==null && drierDt>=3;
+      const support=[`High superheat (${sh}°F)`,`High subcooling (${sc}°F)`];
+      if(drierDt!==null) support.push(`Filter-drier temperature drop (${drierDt}°F)`);
+      candidates.push({
+        title:drierConfirmed ? "Likely restricted liquid-line filter drier" : "Likely refrigerant restriction",
+        score:drierConfirmed ? 94 : 88,
+        support,
+        conflict:drierConfirmed ? ["Confirm the temperature drop with secure, insulated probe contact"] : drierDt!==null ? [`Filter-drier drop is only ${drierDt}°F — check the metering device for the restriction`] : ["Need filter-drier inlet and outlet temperatures to help locate the restriction"],
+        next:drierConfirmed ? "Repeat the filter-drier inlet/outlet test with stabilized, insulated probes, then confirm metering-device feed before opening the system." : "Measure filter-drier inlet/outlet temperatures and check metering-device feed.",
+        disproof:drierConfirmed ? "A repeatable drop below 3°F with normal metering-device feed would argue against a filter-drier restriction." : "If no pressure/temperature drop exists across the suspect restriction and the metering device feeds normally, restriction is unlikely."
+      });
+    }
     if(sh<=5 && sc>=15) candidates.push({title:"Possible overcharge or evaporator overfeeding",score:73,support:[`Low superheat (${sh}°F)`,`High subcooling (${sc}°F)`],conflict:["Airflow and metering-device behavior can mimic this"],next:"Verify airflow first, then compare charge to manufacturer charging method.",disproof:"Normal charge by weight with normal airflow shifts suspicion toward metering-device overfeed."});
     if(sh<=5 && sc>=7 && sc<=14) candidates.push({title:"Evaporator may be overfed / low heat load",score:64,support:[`Low superheat (${sh}°F)`,`Subcooling not clearly low (${sc}°F)`],conflict:["Need indoor load and airflow evidence"],next:"Check return-air temperature, blower speed, filter/coil condition, and metering control.",disproof:"Normal indoor load and stable target superheat would disprove overfeed."});
   }
+  if(drierDt!==null && drierDt>=3 && !(sh!==null && sc!==null && sh>=20 && sc>=15)) candidates.push({title:"Possible liquid-line filter-drier restriction",score:78,support:[`Filter-drier temperature drop (${drierDt}°F)`],conflict:["Need stabilized superheat and subcooling to confirm system impact"],next:"Confirm probe contact, then record stabilized superheat and subcooling and inspect metering-device feed.",disproof:"A repeatable drop below 3°F with normal refrigerant feeding would argue against a filter-drier restriction."});
   if(dt!==null && dt<14) candidates.push({title:"Low cooling capacity — airflow, refrigerant, or compressor issue",score:58,support:[`Low ΔT (${dt}°F)`],conflict:["ΔT alone does not identify root cause"],next:"Separate airflow from refrigeration using SH/SC, saturation temperatures, and amp draw.",disproof:"A normal stabilized 16–22°F ΔT under normal humidity/load reduces likelihood of a capacity fault."});
   if(run!==null && rla!==null && run < rla*0.45) candidates.push({title:"Possible weak / non-pumping compressor",score:76,support:[`Running amps ${run} A are far below RLA ${rla} A`],conflict:["Must correlate with compression/pressure differential"],next:"Check suction/discharge pressure differential and equalization behavior.",disproof:"Normal pressure differential and capacity would disprove a pumping failure."});
   if(stat!==null && stat>0.8) candidates.push({title:"High external static pressure / airflow restriction",score:84,support:[`Total external static ${stat} in. w.c. is high`],conflict:["Equipment rated maximum static should be confirmed"],next:"Check filter, coil, return/supply restrictions, dampers, and blower setup.",disproof:"Static below equipment maximum with correct airflow disproves excessive-static diagnosis."});
@@ -648,6 +676,7 @@ async function seniorAnalyze(){
     Object.entries(j.parsed_measurements||{}).forEach(([k,v])=>{
       const el=document.querySelector(`[data-measure="${k}"]`); if(el && !el.value) el.value=v;
     });
+    updateDrierDrop();
   }catch(e){
     // Local fallback: place the spoken text into observations and use deterministic engine.
     $('observations').value += ($('observations').value?' ':'')+text;
